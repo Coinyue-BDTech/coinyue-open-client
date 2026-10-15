@@ -2,6 +2,7 @@ package com.coinyue.open.client.mcp;
 
 import com.coinyue.open.client.CoinyueOpenClient;
 import com.coinyue.open.client.exception.CoinyueOpenException;
+import com.coinyue.open.client.model.resp.SpCreateRAGDocumentResp;
 import com.coinyue.open.client.model.resp.SpMerchantInfoResp;
 import com.coinyue.open.client.model.resp.SpRefIdQueryResp;
 import io.modelcontextprotocol.server.McpServerFeatures;
@@ -135,13 +136,62 @@ public class McpTools {
     }
 
     /**
+     * 构建 createRAGDocument 工具定义。
+     */
+    public static McpServerFeatures.SyncToolSpecification createRAGDocumentTool(CoinyueOpenClient client) {
+        McpSchema.Tool tool = McpSchema.Tool.builder()
+                .name("createRAGDocument")
+                .description("创建或更新RAG知识库中的Markdown文档。支持多级目录路径，目录不存在时会自动创建。如果文档已存在则更新内容。")
+                .inputSchema(new McpSchema.JsonSchema("object",
+                        Map.of(
+                                "documentPath", Map.of("type", "string", "description", "文档相对路径，如 a/b/c.md"),
+                                "markdown", Map.of("type", "string", "description", "Markdown 格式内容")
+                        ),
+                        List.of("documentPath", "markdown"),
+                        null, null, null))
+                .build();
+
+        return McpServerFeatures.SyncToolSpecification.builder()
+                .tool(tool)
+                .callHandler((exchange, request) -> {
+                    try {
+                        String documentPath = (String) request.arguments().get("documentPath");
+                        String markdown = (String) request.arguments().get("markdown");
+                        SpCreateRAGDocumentResp resp = client.createRAGDocument(documentPath, markdown);
+                        String json = String.format(
+                                "{\"retCode\":%d,\"retMsg\":\"%s\",\"identify\":\"%s\"}",
+                                resp.retCode,
+                                escapeJson(resp.retMsg),
+                                escapeJson(resp.identify)
+                        );
+                        return new McpSchema.CallToolResult(
+                                List.of(new McpSchema.TextContent(json)),
+                                false
+                        );
+                    } catch (CoinyueOpenException e) {
+                        String json = String.format(
+                                "{\"error\":true,\"gateState\":%d,\"message\":\"%s\"}",
+                                e.getGateState(),
+                                escapeJson(e.getMessage())
+                        );
+                        return new McpSchema.CallToolResult(
+                                List.of(new McpSchema.TextContent(json)),
+                                true
+                        );
+                    }
+                })
+                .build();
+    }
+
+    /**
      * 获取所有 Tool 定义列表。
      * 未来新增 API 时，在此处追加即可。
      */
     public static List<McpServerFeatures.SyncToolSpecification> allTools(CoinyueOpenClient client) {
         return List.of(
                 getMerchantInfoTool(client),
-                queryRefIdTool(client)
+                queryRefIdTool(client),
+                createRAGDocumentTool(client)
         );
     }
 }

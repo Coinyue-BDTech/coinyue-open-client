@@ -3,9 +3,11 @@ package com.coinyue.open.client;
 import com.coinyue.open.client.crypto.AesUtil;
 import com.coinyue.open.client.exception.CoinyueOpenException;
 import com.coinyue.open.client.http.HttpUtil;
+import com.coinyue.open.client.model.req.SpCreateRAGDocumentReq;
 import com.coinyue.open.client.model.req.SpMerchantInfoReq;
 import com.coinyue.open.client.model.req.SpRefIdQueryReq;
 import com.coinyue.open.client.model.resp.GateResp;
+import com.coinyue.open.client.model.resp.SpCreateRAGDocumentResp;
 import com.coinyue.open.client.model.resp.SpMerchantInfoResp;
 import com.coinyue.open.client.model.resp.SpRefIdQueryResp;
 import com.google.gson.Gson;
@@ -100,6 +102,24 @@ public class CoinyueOpenClient {
         return send(req, SpRefIdQueryResp.class);
     }
 
+    /**
+     * 创建 RAG 文档。
+     * <p>
+     * 根据文档相对路径创建 Markdown 文档，如果路径中的目录不存在会自动创建。
+     * 如果文档已存在则更新 markdown 内容。
+     * </p>
+     *
+     * @param documentPath 文档相对路径，如 a/b/c.md
+     * @param markdown     Markdown 内容
+     * @return 创建响应，包含文档 identify
+     */
+    public SpCreateRAGDocumentResp createRAGDocument(String documentPath, String markdown) throws CoinyueOpenException {
+        SpCreateRAGDocumentReq req = new SpCreateRAGDocumentReq();
+        req.documentPath = documentPath;
+        req.markdown = markdown;
+        return send(req, SpCreateRAGDocumentResp.class);
+    }
+
     // ============================================================
     //  内部通用方法
     // ============================================================
@@ -143,6 +163,10 @@ public class CoinyueOpenClient {
         if (dto instanceof SpRefIdQueryResp refIdResp && refIdResp.retCode != 0) {
             throw new CoinyueOpenException(0,
                     "业务失败: " + refIdResp.retMsg + " (retCode=" + refIdResp.retCode + ")");
+        }
+        if (dto instanceof SpCreateRAGDocumentResp ragResp && ragResp.retCode != 0) {
+            throw new CoinyueOpenException(0,
+                    "业务失败: " + ragResp.retMsg + " (retCode=" + ragResp.retCode + ")");
         }
 
         return dto;
