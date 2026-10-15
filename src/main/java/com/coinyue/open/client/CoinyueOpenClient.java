@@ -4,8 +4,10 @@ import com.coinyue.open.client.crypto.AesUtil;
 import com.coinyue.open.client.exception.CoinyueOpenException;
 import com.coinyue.open.client.http.HttpUtil;
 import com.coinyue.open.client.model.req.SpMerchantInfoReq;
+import com.coinyue.open.client.model.req.SpRefIdQueryReq;
 import com.coinyue.open.client.model.resp.GateResp;
 import com.coinyue.open.client.model.resp.SpMerchantInfoResp;
+import com.coinyue.open.client.model.resp.SpRefIdQueryResp;
 import com.google.gson.Gson;
 
 import java.util.HashMap;
@@ -80,6 +82,24 @@ public class CoinyueOpenClient {
         return send(req, SpMerchantInfoResp.class);
     }
 
+    /**
+     * 查询或创建关联ID。
+     * <p>
+     * 传入一批 refStrs（如文件路径），返回每个 refStr 对应的 assignId。
+     * 如果 refStr 不存在则自动创建。
+     * </p>
+     *
+     * @param objType 对象类型
+     * @param refStrs 关联字符串列表
+     * @return 关联ID查询响应
+     */
+    public SpRefIdQueryResp queryRefId(String objType, java.util.List<String> refStrs) throws CoinyueOpenException {
+        SpRefIdQueryReq req = new SpRefIdQueryReq();
+        req.objType = objType;
+        req.refStrs = refStrs;
+        return send(req, SpRefIdQueryResp.class);
+    }
+
     // ============================================================
     //  内部通用方法
     // ============================================================
@@ -113,11 +133,16 @@ public class CoinyueOpenClient {
                     "网关失败: " + gateResp.gateStateMsg + " (gateState=" + gateResp.gateState + ")");
         }
 
-        // 7. 检查业务状态
-        T dto = (T) gateResp.dto;
+        // 7. 检查业务状态并返回
+        T dto = gateResp.getDto(respType);
+
         if (dto instanceof SpMerchantInfoResp spResp && spResp.retCode != 0) {
             throw new CoinyueOpenException(0,
                     "业务失败: " + spResp.retMsg + " (retCode=" + spResp.retCode + ")");
+        }
+        if (dto instanceof SpRefIdQueryResp refIdResp && refIdResp.retCode != 0) {
+            throw new CoinyueOpenException(0,
+                    "业务失败: " + refIdResp.retMsg + " (retCode=" + refIdResp.retCode + ")");
         }
 
         return dto;

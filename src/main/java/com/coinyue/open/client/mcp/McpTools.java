@@ -3,6 +3,7 @@ package com.coinyue.open.client.mcp;
 import com.coinyue.open.client.CoinyueOpenClient;
 import com.coinyue.open.client.exception.CoinyueOpenException;
 import com.coinyue.open.client.model.resp.SpMerchantInfoResp;
+import com.coinyue.open.client.model.resp.SpRefIdQueryResp;
 import io.modelcontextprotocol.server.McpServerFeatures;
 import io.modelcontextprotocol.spec.McpSchema;
 
@@ -75,13 +76,72 @@ public class McpTools {
         return String.join(",", parts);
     }
 
+    private static String formatResultMap(Map<String, String> map) {
+        if (map == null || map.isEmpty()) return "{}";
+        List<String> parts = new ArrayList<>();
+        for (Map.Entry<String, String> entry : map.entrySet()) {
+            parts.add(String.format("\"%s\":\"%s\"", escapeJson(entry.getKey()), escapeJson(entry.getValue())));
+        }
+        return "{" + String.join(",", parts) + "}";
+    }
+
+    /**
+     * 构建 queryRefId 工具定义。
+     */
+    public static McpServerFeatures.SyncToolSpecification queryRefIdTool(CoinyueOpenClient client) {
+        McpSchema.Tool tool = McpSchema.Tool.builder()
+                .name("queryRefId")
+                .description("查询或创建关联ID。传入对象类型和一组关联字符串（如文件路径），返回每个字符串对应的唯一assignId。如果关联字符串不存在则自动创建。")
+                .inputSchema(new McpSchema.JsonSchema("object",
+                        Map.of(
+                                "objType", Map.of("type", "string", "description", "对象类型"),
+                                "refStrs", Map.of("type", "array", "items", Map.of("type", "string"), "description", "关联字符串列表")
+                        ),
+                        List.of("objType", "refStrs"),
+                        null, null, null))
+                .build();
+
+        return McpServerFeatures.SyncToolSpecification.builder()
+                .tool(tool)
+                .callHandler((exchange, request) -> {
+                    try {
+                        String objType = (String) request.arguments().get("objType");
+                        @SuppressWarnings("unchecked")
+                        List<String> refStrs = (List<String>) request.arguments().get("refStrs");
+                        SpRefIdQueryResp resp = client.queryRefId(objType, refStrs);
+                        String json = String.format(
+                                "{\"retCode\":%d,\"retMsg\":\"%s\",\"result\":%s}",
+                                resp.retCode,
+                                escapeJson(resp.retMsg),
+                                formatResultMap(resp.result)
+                        );
+                        return new McpSchema.CallToolResult(
+                                List.of(new McpSchema.TextContent(json)),
+                                false
+                        );
+                    } catch (CoinyueOpenException e) {
+                        String json = String.format(
+                                "{\"error\":true,\"gateState\":%d,\"message\":\"%s\"}",
+                                e.getGateState(),
+                                escapeJson(e.getMessage())
+                        );
+                        return new McpSchema.CallToolResult(
+                                List.of(new McpSchema.TextContent(json)),
+                                true
+                        );
+                    }
+                })
+                .build();
+    }
+
     /**
      * 获取所有 Tool 定义列表。
      * 未来新增 API 时，在此处追加即可。
      */
     public static List<McpServerFeatures.SyncToolSpecification> allTools(CoinyueOpenClient client) {
         return List.of(
-                getMerchantInfoTool(client)
+                getMerchantInfoTool(client),
+                queryRefIdTool(client)
         );
     }
 }

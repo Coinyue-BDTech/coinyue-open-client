@@ -12,6 +12,17 @@ public class GateResp {
     public String requestId;
     /** 日志 ID */
     public String logId;
-    /** 业务层数据 */
-    public SpMerchantInfoResp dto;
+    /** 业务层数据（原始 JSON 对象） */
+    public Object dto;
+
+    /**
+     * 将 dto 反序列化为指定类型。
+     */
+    public <T> T getDto(Class<T> clazz) {
+        if (dto == null) return null;
+        if (clazz.isInstance(dto)) return clazz.cast(dto);
+        com.google.gson.Gson gson = new com.google.gson.Gson();
+        String json = gson.toJson(dto);
+        return gson.fromJson(json, clazz);
+    }
 }
